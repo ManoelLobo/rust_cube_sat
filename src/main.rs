@@ -1,46 +1,79 @@
 #[derive(Debug)]
 struct CubeSat {
     id: u64,
-    mailbox: MailBox,
 }
 
 impl CubeSat {
-    fn recv(&mut self) -> Option<Message> {
-        self.mailbox.messages.pop()
+    fn recv(&self, mailbox: &mut Mailbox) -> Option<Message> {
+        mailbox.deliver(self)
     }
 }
 
 #[derive(Debug)]
-struct MailBox {
+struct Mailbox {
     messages: Vec<Message>,
 }
 
-type Message = String;
+impl Mailbox {
+    fn post(&mut self, msg: Message) {
+        self.messages.push(msg);
+    }
+
+    fn deliver(&mut self, receiver: &CubeSat) -> Option<Message> {
+        for i in 0..self.messages.len() {
+            if self.messages[i].receiver == receiver.id {
+                return Some(self.messages.remove(i));
+            }
+        }
+
+        None
+    }
+}
+
+#[derive(Debug)]
+struct Message {
+    receiver: u64,
+    content: String,
+}
 
 struct GroundStation;
 
 impl GroundStation {
-    fn send(&self, receiver: &mut CubeSat, msg: Message) {
-        receiver.mailbox.messages.push(msg);
+    fn connect(&self, sat_id: u64) -> CubeSat {
+        CubeSat { id: sat_id }
     }
+
+    fn send(&self, mailbox: &mut Mailbox, msg: Message) {
+        mailbox.post(msg);
+    }
+}
+
+fn fetch_sat_ids() -> Vec<u64> {
+    vec![1, 2, 3]
 }
 
 fn main() {
     let base = GroundStation {};
-    let mut sat_a = CubeSat {
-        id: 0,
-        mailbox: MailBox { messages: vec![] },
-    };
+    let mut mailbox = Mailbox { messages: vec![] };
 
-    println!("t0: {:?}", sat_a);
+    let sat_ids = fetch_sat_ids();
 
-    base.send(&mut sat_a, Message::from("Hello sat"));
+    for sat_id in sat_ids {
+        // let sat = base.connect(sat_id);
+        let msg = Message {
+            receiver: sat_id,
+            content: "Hey".to_string(),
+        };
 
-    println!("t1: {:?}", sat_a);
+        base.send(&mut mailbox, msg)
+    }
 
-    let msg = sat_a.recv();
+    let sat_ids = fetch_sat_ids();
 
-    println!("t2: {:?}", sat_a);
+    for sat_id in sat_ids {
+        let sat = base.connect(sat_id);
 
-    println!("msg: {:?}", msg);
+        let msg = sat.recv(&mut mailbox);
+        println!("{:?}: {:?}", sat, msg);
+    }
 }
